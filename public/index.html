@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task API Sandbox</title>
+  <style>
+    :root {
+      font-family: "Segoe UI", sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .shell {
+      width: min(1100px, 100%);
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.45);
+    }
+    h1 { margin: 0 0 6px 0; }
+    h2 { margin: 16px 0 8px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .card {
+      background: #0b1220;
+      border: 1px solid #1f2937;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    label { display: block; margin: 8px 0 4px; font-size: 13px; color: #9ca3af; }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #1f2937;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(120deg, #6366f1, #22d3ee);
+      color: #0b1220;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .log {
+      background: #030712;
+      padding: 10px;
+      border-radius: 10px;
+      min-height: 140px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      overflow: auto;
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .pill { padding: 6px 10px; border-radius: 999px; background: #1f2937; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="row" style="justify-content: space-between;">
+      <div>
+        <h1>Task API Playground</h1>
+        <p style="margin:0;color:#9ca3af;">Register / login, then CRUD tasks using your token.</p>
+      </div>
+      <div class="pill" id="auth-status">Logged out</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Register</h2>
+        <label>Name</label><input id="reg-name" placeholder="Ada Lovelace">
+        <label>Email</label><input id="reg-email" placeholder="ada@example.com">
+        <label>Password</label><input id="reg-pass" type="password" placeholder="******">
+        <label>Role</label>
+        <select id="reg-role">
+          <option value="user">user</option>
+          <option value="admin">admin</option>
+        </select>
+        <button onclick="register()">Create account</button>
+      </div>
+
+      <div class="card">
+        <h2>Login</h2>
+        <label>Email</label><input id="login-email" placeholder="ada@example.com">
+        <label>Password</label><input id="login-pass" type="password" placeholder="******">
+        <button onclick="login()">Sign in</button>
+        <button onclick="logout()" style="background:#1f2937;color:#e5e7eb;">Logout</button>
+      </div>
+
+      <div class="card">
+        <h2>Create Task</h2>
+        <label>Title</label><input id="task-title" placeholder="Ship MVP">
+        <label>Description</label><textarea id="task-desc" rows="3"></textarea>
+        <label>Status</label>
+        <select id="task-status">
+          <option value="pending">pending</option>
+          <option value="in_progress">in_progress</option>
+          <option value="done">done</option>
+        </select>
+        <button onclick="createTask()">Add task</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <div class="row" style="justify-content: space-between;">
+        <h2 style="margin:0;">Tasks</h2>
+        <button onclick="loadTasks()" style="margin:0;">Refresh</button>
+      </div>
+      <div id="tasks"></div>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <h2 style="margin-top:0;">Logs</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <script>
+    const apiBase = '/api/v1';
+    let token = localStorage.getItem('token');
+    updateAuthStatus();
+    if (token) loadTasks();
+
+    function updateAuthStatus() {
+      const el = document.getElementById('auth-status');
+      el.textContent = token ? 'JWT loaded' : 'Logged out';
+      el.style.background = token ? '#10b98133' : '#1f2937';
+      el.style.color = token ? '#34d399' : '#e5e7eb';
+    }
+
+    function log(message, data) {
+      const box = document.getElementById('log');
+      const line = `[${new Date().toLocaleTimeString()}] ${message}${data ? ' ' + JSON.stringify(data, null, 2) : ''}\n`;
+      box.textContent = line + box.textContent;
+    }
+
+    async function register() {
+      const payload = {
+        name: document.getElementById('reg-name').value,
+        email: document.getElementById('reg-email').value,
+        password: document.getElementById('reg-pass').value,
+        role: document.getElementById('reg-role').value,
+      };
+      await send('/auth/register', payload);
+    }
+
+    async function login() {
+      const payload = {
+        email: document.getElementById('login-email').value,
+        password: document.getElementById('login-pass').value,
+      };
+      const res = await send('/auth/login', payload);
+      if (res?.token) {
+        token = res.token;
+        localStorage.setItem('token', token);
+        updateAuthStatus();
+        loadTasks();
+      }
+    }
+
+    function logout() {
+      token = null;
+      localStorage.removeItem('token');
+      updateAuthStatus();
+      document.getElementById('tasks').innerHTML = '';
+      log('Logged out');
+    }
+
+    async function createTask() {
+      const payload = {
+        title: document.getElementById('task-title').value,
+        description: document.getElementById('task-desc').value,
+        status: document.getElementById('task-status').value,
+      };
+      await send('/tasks', payload, 'POST');
+      await loadTasks();
+    }
+
+    async function loadTasks() {
+      const res = await send('/tasks', null, 'GET');
+      const container = document.getElementById('tasks');
+      if (!res?.tasks) {
+        container.innerHTML = '<p style=\"color:#9ca3af;\">No data</p>';
+        return;
+      }
+      container.innerHTML = res.tasks
+        .map(
+          t => `
+          <div style="border:1px solid #1f2937;padding:8px;border-radius:10px;margin:6px 0;">
+            <div class="row" style="justify-content: space-between;">
+              <strong>${t.title}</strong>
+              <span class="pill">${t.status}</span>
+            </div>
+            <div style="color:#9ca3af;font-size:13px;">${t.description || ''}</div>
+            <div class="row">
+              <button onclick="updateStatus(${t.id}, 'done')">Mark done</button>
+              <button onclick="deleteTask(${t.id})" style="background:#b91c1c;color:#fef2f2;">Delete</button>
+            </div>
+          </div>`
+        )
+        .join('');
+    }
+
+    async function updateStatus(id, status) {
+      await send(`/tasks/${id}`, { status }, 'PUT');
+      await loadTasks();
+    }
+
+    async function deleteTask(id) {
+      await send(`/tasks/${id}`, null, 'DELETE');
+      await loadTasks();
+    }
+
+    async function send(path, body, method = 'POST') {
+      try {
+        const res = await fetch(apiBase + path, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: 'Bearer ' + token } : {}),
+          },
+          body: method === 'GET' || method === 'DELETE' ? undefined : JSON.stringify(body ?? {}),
+        });
+        const text = await res.text();
+        let data = {};
+        try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { raw: text }; }
+        if (!res.ok) {
+          log(`${method} ${path} -> ${res.status}`, data);
+          alert(data.message || 'Request failed');
+          return;
+        }
+        log(`${method} ${path} -> ${res.status}`, data);
+        return data;
+      } catch (err) {
+        log(`Network error on ${method} ${path}: ${err.message}`);
+      }
+    }
+  </script>
+</body>
+</html>
