@@ -1,6 +1,6 @@
 # Task API + Minimal Frontend
 
-Backend-first assignment implementing JWT auth, RBAC, and CRUD for tasks. Tech stack: Node.js, Express 5, MongoDB (Mongoose), Swagger, vanilla JS frontend.
+Backend-first assignment implementing JWT auth, RBAC, and CRUD for tasks. Tech stack: Node.js, Express 5, MongoDB (Mongoose), SQLite (dev/local fallback), Swagger, vanilla JS frontend.
 
 ## Quick start
 - Copy `.env.example` to `.env` and set `JWT_SECRET`, `MONGO_URI` (e.g., local Mongo or Atlas), and `PORT` if needed.
